@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  ml-grpc-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock_prediction_ml_grpc
+    command: python -m apps.ml_engine.grpc_server
+    ports:
+      - "50051:50051"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GRPC_PORT=50051
+    volumes:
+      - .:/app
+    networks:
+      - stock_backend_net
+    restart: unless-stopped
+
+  backend-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock_prediction_backend_api
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GRPC_ML_HOST=ml-grpc-service:50051
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001
+    volumes:
+      - .:/app
+      - backend_sqlite_data:/app/data
+    depends_on:
+      - ml-grpc-service
+    networks:
+      - stock_backend_net
+    restart: unless-stopped
+
+volumes:
+  backend_sqlite_data:
+    name: stock_backend_sqlite_data
+
+networks:
+  stock_backend_net:
+    name: stock_backend_network
+    driver: bridge

@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package ml_engine;
+
+service PredictionService {
+  rpc Predict (PredictRequest) returns (PredictResponse);
+  rpc AnalyzeSentiment (SentimentRequest) returns (SentimentResponse);
+  rpc LiveScan (LiveScanRequest) returns (LiveScanResponse);
+}
+
+message PredictRequest {
+  string ticker = 1;
+  repeated float prices = 2;
+  map<string, float> features = 3;
+}
+
+message PredictResponse {
+  string ticker = 1;
+  string direction_signal = 2;
+  float probability_up = 3;
+  float probability_down = 4;
+  string model_used = 5;
+  string timestamp = 6;
+  string status = 7;
+}
+
+message SentimentRequest {
+  string text = 1;
+}
+
+message SentimentResponse {
+  string sentiment_label = 1;
+  float sentiment_score = 2;
+  float impact_score = 3;
+  string status = 4;
+}
+
+message LiveScanRequest {
+  string query = 1;
+}
+
+message NewsItemProto {
+  string title = 1;
+  string source = 2;
+  string link = 3;
+  string published = 4;
+  float sentiment_score = 5;
+  string sentiment_label = 6;
+  float impact_score = 7;
+}
+
+message MarketSnapshotProto {
+  float sma_20 = 1;
+  float sma_50 = 2;
+  float rsi_14 = 3;
+  float macd = 4;
+  float macd_signal = 5;
+  int64 volume = 6;
+}
+
+message LiveScanResponse {
+  string status = 1;
+  string query = 2;
+  string ticker = 3;
+  float current_price = 4;
+  float change_percent = 5;
+  string currency = 6;
+  
+  string direction_signal = 7;
+  float probability_up = 8;
+  float probability_down = 9;
+  
+  string advice_action = 10;
+  string advice_summary = 11;
+  string advice_rationale = 12;
+  string risk_level = 13;
+  
+  float average_sentiment = 14;
+  string sentiment_label = 15;
+  int32 news_count = 16;
+  
+  repeated NewsItemProto top_news = 17;
+  MarketSnapshotProto market_snapshot = 18;
+  string error_message = 19;
+}
