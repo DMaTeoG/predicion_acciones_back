@@ -153,9 +153,18 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# CORS configuration: frontend local (puertos 3000 y 3001)
+from urllib.parse import urlparse
+
+def _sanitize_origin(origin: str) -> str:
+    origin = origin.strip().rstrip('/')
+    parsed = urlparse(origin)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return origin
+
+# CORS configuration: frontend local y producción
 CORS_ALLOWED_ORIGINS = [
-    origin.strip()
+    _sanitize_origin(origin)
     for origin in os.getenv(
         'CORS_ALLOWED_ORIGINS',
         'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001',
