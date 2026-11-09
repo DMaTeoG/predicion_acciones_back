@@ -231,7 +231,7 @@ class LiveQuoteStreamView(APIView):
 
             # Emite eventos en tiempo real cada 1 segundo con micro-oscilación de libro de órdenes si el mercado está estático
             import random
-            for step in range(300):
+            for step in range(90):
                 try:
                     info = ticker_obj.fast_info
                     live_val = getattr(info, 'last_price', None)
