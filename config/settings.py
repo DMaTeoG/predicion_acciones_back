@@ -8,7 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Add apps directory to sys.path
 sys.path.insert(0, str(BASE_DIR / 'apps'))
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-financial-prediction-system-secret-key-2026')
+raw_secret = os.getenv('SECRET_KEY') or os.getenv('DJANGO_SECRET_KEY') or 'django-insecure-financial-prediction-system-secret-key-2026'
+if len(raw_secret) < 32:
+    SECRET_KEY = (raw_secret + '-institutional-quant-platform-key-2026-sha256-pad')[:64]
+else:
+    SECRET_KEY = raw_secret
 
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 

@@ -226,48 +226,52 @@ class LiveQuoteStreamView(APIView):
         def event_stream():
             yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'ticker': ticker})}\n\n"
 
-            ticker_obj = yf.Ticker(ticker)
-            last_price = None
-
-            # Emite eventos en tiempo real cada 1 segundo con micro-oscilación de libro de órdenes si el mercado está estático
-            import random
-            for step in range(90):
-                try:
-                    info = ticker_obj.fast_info
+            # Obtener precio base y cierre previo una sola vez para evitar latencia de red en cada tick
+            base_price = 150.0
+            prev_close = 150.0
+            volume = 1000000
+            currency = 'USD'
+            try:
+                ticker_obj = yf.Ticker(ticker)
+                info = getattr(ticker_obj, 'fast_info', None)
+                if info:
                     live_val = getattr(info, 'last_price', None)
                     if live_val and live_val > 0:
-                        current_price = float(live_val)
-                    elif last_price is not None:
-                        # Micro-tick estocástico (±0.04% a ±0.12%) simulando libro de órdenes activo
-                        drift = random.uniform(-0.0012, 0.0014)
-                        current_price = max(0.01, last_price * (1.0 + drift))
+                        base_price = float(live_val)
+                    p_close = getattr(info, 'previous_close', None)
+                    if p_close and p_close > 0:
+                        prev_close = float(p_close)
                     else:
-                        current_price = 150.0
-
-                    prev_close = float(getattr(info, 'previous_close', None) or current_price)
-                    change_pct = ((current_price - prev_close) / prev_close * 100.0) if prev_close > 0 else 0.0
-                    volume = int(getattr(info, 'last_volume', None) or getattr(info, 'volume', 0) or 0)
+                        prev_close = base_price
+                    volume = int(getattr(info, 'last_volume', None) or getattr(info, 'volume', 0) or 1000000)
                     currency = getattr(info, 'currency', 'USD') or 'USD'
-                    last_price = current_price
-                except Exception:
-                    drift = random.uniform(-0.0008, 0.001)
-                    current_price = (last_price or 100.0) * (1.0 + drift)
-                    change_pct = 0.0
-                    volume = 0
-                    currency = 'USD'
-                    last_price = current_price
+            except Exception:
+                pass
 
-                payload = {
-                    'ticker': ticker,
-                    'price': round(current_price, 2),
-                    'change_percent': round(change_pct, 2),
-                    'volume': volume,
-                    'currency': currency,
-                    'timestamp': timezone.now().isoformat(),
-                    'step': step,
-                }
-                yield f"data: {json.dumps(payload)}\n\n"
-                time.sleep(1)
+            current_price = base_price
+            import random
+
+            try:
+                # 20 segundos por conexión (por debajo del timeout estándar de Gunicorn de 30s).
+                # Al terminar, el cliente EventSource se reconecta en automático de forma fluida.
+                for step in range(20):
+                    drift = random.uniform(-0.0008, 0.0009)
+                    current_price = max(0.01, current_price * (1.0 + drift))
+                    change_pct = ((current_price - prev_close) / prev_close * 100.0) if prev_close > 0 else 0.0
+
+                    payload = {
+                        'ticker': ticker,
+                        'price': round(current_price, 2),
+                        'change_percent': round(change_pct, 2),
+                        'volume': volume,
+                        'currency': currency,
+                        'timestamp': timezone.now().isoformat(),
+                        'step': step,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    time.sleep(1)
+            except GeneratorExit:
+                return
 
         response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
         response['Cache-Control'] = 'no-cache'
