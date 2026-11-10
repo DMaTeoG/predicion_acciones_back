@@ -1,1 +1,1 @@
-web: gunicorn config.wsgi:application --config gunicorn.conf.py
+web: python manage.py migrate --noinput && python manage.py seed_data && gunicorn config.wsgi:application --config gunicorn.conf.py

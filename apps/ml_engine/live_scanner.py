@@ -223,13 +223,27 @@ class LiveAssetScanner:
         # Calcular indicadores
         df_ind = self.calculator.calculate_indicators(df_hist)
 
-        # Metadata de empresa / activo
+        # Metadata de empresa / activo (usando history_metadata y fast_info sin invocar .info que requiere Crumb en Render)
         try:
-            info = ticker_obj.fast_info
-            name = getattr(info, 'name', None) or getattr(ticker_obj, 'info', {}).get('shortName') or name
-            currency = getattr(info, 'currency', 'USD') or 'USD'
-            current_price = float(getattr(info, 'last_price', None) or df_ind.iloc[-1]['close_price'])
-            prev_close = float(getattr(info, 'previous_close', None) or df_ind.iloc[-2]['close_price'])
+            meta = getattr(ticker_obj, '_history_metadata', None) or {}
+            info = getattr(ticker_obj, 'fast_info', None)
+            name = (
+                meta.get('longName')
+                or meta.get('shortName')
+                or name
+            )
+            currency = meta.get('currency') or getattr(info, 'currency', 'USD') or 'USD'
+            current_price = float(
+                meta.get('regularMarketPrice')
+                or getattr(info, 'last_price', None)
+                or df_ind.iloc[-1]['close_price']
+            )
+            prev_close = float(
+                meta.get('chartPreviousClose')
+                or meta.get('previousClose')
+                or getattr(info, 'previous_close', None)
+                or (df_ind.iloc[-2]['close_price'] if len(df_ind) >= 2 else current_price)
+            )
             change_pct = ((current_price - prev_close) / prev_close) * 100.0 if prev_close > 0 else 0.0
         except Exception:
             currency = "USD"
@@ -349,8 +363,16 @@ class LiveAssetScanner:
                 'sma_50': round(float(row['sma_50']), 2) if pd.notna(row['sma_50']) else None,
             })
 
-        # 6. Guardar en UserScan
-        scan_record = UserScan.objects.create(
+        # 6. Guardar en UserScan (con auto-reparación de migración si la tabla aún no existe)
+        market_snapshot_data = {
+            'rsi_14': round(feature_data['rsi_14'], 1),
+            'macd': round(feature_data['macd'], 3),
+            'sma_20': round(feature_data['sma_20'], 2),
+            'sma_50': round(feature_data['sma_50'], 2),
+            'news_sentiment': round(mean_sentiment, 3),
+            'news_count': len(processed_news),
+        }
+        scan_kwargs = dict(
             user=user if (user and user.is_authenticated) else None,
             query=clean_query,
             ticker=ticker_symbol,
@@ -364,18 +386,26 @@ class LiveAssetScanner:
             prob_baja=round(p_baja, 4),
             advice=advice,
             top_news=processed_news,
-            market_snapshot={
-                'rsi_14': round(feature_data['rsi_14'], 1),
-                'macd': round(feature_data['macd'], 3),
-                'sma_20': round(feature_data['sma_20'], 2),
-                'sma_50': round(feature_data['sma_50'], 2),
-                'news_sentiment': round(mean_sentiment, 3),
-                'news_count': len(processed_news),
-            }
+            market_snapshot=market_snapshot_data,
         )
+        scan_id = 0
+        created_at_iso = timezone.now().isoformat()
+        try:
+            scan_record = UserScan.objects.create(**scan_kwargs)
+            scan_id = scan_record.id
+            created_at_iso = scan_record.created_at.isoformat()
+        except Exception:
+            try:
+                from django.core.management import call_command
+                call_command('migrate', interactive=False, verbosity=0)
+                scan_record = UserScan.objects.create(**scan_kwargs)
+                scan_id = scan_record.id
+                created_at_iso = scan_record.created_at.isoformat()
+            except Exception:
+                pass
 
         return {
-            'id': scan_record.id,
+            'id': scan_id,
             'query': clean_query,
             'keywords': clean_keywords,
             'query_type': query_type,
@@ -397,6 +427,6 @@ class LiveAssetScanner:
             'top_news': processed_news,
             'all_news_count': len(processed_news),
             'market_data': market_points,
-            'market_snapshot': scan_record.market_snapshot,
-            'created_at': scan_record.created_at.isoformat(),
+            'market_snapshot': market_snapshot_data,
+            'created_at': created_at_iso,
         }

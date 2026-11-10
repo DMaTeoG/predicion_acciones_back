@@ -26,5 +26,5 @@ COPY . /app/
 # Exponer puertos: 8000 (Django API REST) y 50051 (gRPC Microservice)
 EXPOSE 8000 50051
 
-# Comando por defecto (iniciar API REST de Django)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Comando por defecto (aplicar migraciones e iniciar servidor Gunicorn/Django)
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_data && gunicorn config.wsgi:application --config gunicorn.conf.py --bind 0.0.0.0:${PORT:-8000}"]
