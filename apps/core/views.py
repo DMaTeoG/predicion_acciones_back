@@ -65,7 +65,7 @@ class RegisterView(APIView):
         except Exception as exc:
             try:
                 from django.core.management import call_command
-                call_command('migrate', interactive=False, verbosity=0)
+                call_command('prepare_db')
                 serializer = RegisterSerializer(data=request.data)
                 if serializer.is_valid():
                     user = serializer.save()
@@ -93,7 +93,7 @@ class LoginView(APIView):
             user = authenticate(username=username, password=password)
         except Exception:
             from django.core.management import call_command
-            call_command('migrate', interactive=False, verbosity=0)
+            call_command('prepare_db')
             user = authenticate(username=username, password=password)
 
         if not user:
@@ -181,7 +181,7 @@ class UserScanViewSet(viewsets.ModelViewSet):
         except Exception:
             try:
                 from django.core.management import call_command
-                call_command('migrate', interactive=False, verbosity=0)
+                call_command('prepare_db')
                 return super().list(request, *args, **kwargs)
             except Exception:
                 return Response({'count': 0, 'next': None, 'previous': None, 'results': []}, status=status.HTTP_200_OK)

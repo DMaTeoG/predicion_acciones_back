@@ -397,7 +397,7 @@ class LiveAssetScanner:
         except Exception:
             try:
                 from django.core.management import call_command
-                call_command('migrate', interactive=False, verbosity=0)
+                call_command('prepare_db')
                 scan_record = UserScan.objects.create(**scan_kwargs)
                 scan_id = scan_record.id
                 created_at_iso = scan_record.created_at.isoformat()

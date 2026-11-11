@@ -27,4 +27,4 @@ COPY . /app/
 EXPOSE 8000 50051
 
 # Comando por defecto (aplicar migraciones e iniciar servidor Gunicorn/Django)
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_data && gunicorn config.wsgi:application --config gunicorn.conf.py --bind 0.0.0.0:${PORT:-8000}"]
+CMD ["sh", "-c", "python manage.py prepare_db && gunicorn config.wsgi:application --config gunicorn.conf.py --bind 0.0.0.0:${PORT:-8000}"]

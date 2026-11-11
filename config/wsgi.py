@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 # incluso si el Build Command del proveedor no ejecutó build.sh.
 if os.getenv('AUTO_MIGRATE_ON_STARTUP', 'True') == 'True':
     try:
-        call_command('migrate', interactive=False, verbosity=1)
-        call_command('seed_data', verbosity=0)
+        call_command('prepare_db')
     except Exception as exc:
         logger.warning("Auto-migrate en arranque WSGI omitido o con advertencia: %s", exc)
 
